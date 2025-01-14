@@ -3,6 +3,7 @@ let { track } = require("./model/track.model");
 let { user } = require("./model/user.model");
 let { like } = require("./model/like.model");
 let { sequelize } = require("./lib/index");
+let { Op } = require("@sequelize/core");
 
 const { parse } = require("querystring");
 
@@ -10,6 +11,7 @@ let cors = require("cors");
 const req = require("express/lib/request");
 const res = require("express/lib/response");
 const { userInfo } = require("os");
+const { threadId } = require("worker_threads");
 // let sqlite3 = require('sqlite3').verbose();
 // let { open } = require('sqlite');
 
@@ -224,7 +226,94 @@ app.get("/users/:id/like", async (req, res) => {
   try {
     let userId = req.params.id;
     let trackId = req.query.trackId;
-    let response = await likeTrack(userId, trackId);
+    let response = await likeTrack({ userId, trackId });
+    res.status(200).json(response);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+async function disLikeTrack(data) {
+  let count = await like.destroy({
+    where: { userId: data.userId, trackId: data.trackId },
+  });
+  if (count === 0) {
+    return {};
+  }
+  return { message: "Track DisLiked!" };
+}
+
+app.get("/users/:id/dislike", async (req, res) => {
+  try {
+    let userId = req.params.id;
+    let trackId = req.query.trackId;
+    let response = await disLikeTrack({ userId, trackId });
+    if (!response.message) {
+      res.status(404).json({ message: "No Like Found!" });
+    }
+    res.status(200).json(response);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+async function truncateDBs() {
+  track.truncate();
+  user.truncate();
+  like.truncate();
+  return { message: "Truncated All DBs" };
+}
+
+app.get("/truncate", async (req, res) => {
+  try {
+    let response = await truncateDBs();
+    res.status(200).json(response);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+async function getTracksLikedByUser(userId) {
+  let userLikedTracks = await like.findAll({
+    where: { userId },
+    attributes: ["trackId"],
+  });
+  let trackIds = userLikedTracks.map((track) => track.trackId);
+  let likedTracks = await track.findAll({
+    where: { id: { [Op.in]: trackIds } },
+  });
+  return { likedTracks };
+}
+
+app.get("/users/:id/liked", async (req, res) => {
+  try {
+    let userId = req.params.id;
+    let response = await getTracksLikedByUser(userId);
+    if (response.likedTracks === 0) {
+      return res.status(404).json({ message: "No liked tracks found." });
+    }
+    res.status(200).json(response);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+async function getAllLikedTracksByArtist(userId, artist) {
+  let trackIds = await like.findAll({
+    where: { userId },
+    attributes: ["trackId"],
+  });
+  trackIds = trackIds.map((like) => like.trackId);
+  let likedTracks = await track.findAll({
+    where: { id: { [Op.in]: trackIds }, artist },
+  });
+  return { likedTracks };
+}
+
+app.get("/users/:id/liked-artists", async (req, res) => {
+  try {
+    let userId = req.params.id;
+    let artist = req.query.artist;
+    let response = await getAllLikedTracksByArtist(userId, artist);
     res.status(200).json(response);
   } catch (error) {
     res.status(500).json({ error: error.message });
