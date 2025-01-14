@@ -1,7 +1,10 @@
 let express = require("express");
-let { track } = require("./model/track.model");
-let { user } = require("./model/user.model");
-let { like } = require("./model/like.model");
+let { employee } = require("./model/employee.model");
+let { role } = require("./model/role.model");
+let { department } = require("./model/department.model");
+let { employeeDepartment } = require("./model/employeeDepartment.model");
+let { employeeRole } = require("./model/employeeRole.model");
+
 let { sequelize } = require("./lib/index");
 let { Op } = require("@sequelize/core");
 
@@ -20,304 +23,57 @@ const port = 3000;
 
 app.use(cors());
 app.use(express.json());
-// app.use(express.json());
 
-// let db;
-// (async () => {
-//   db = await open({
-//     filename: '../database.sqlite',
-//     driver: sqlite3.Database,
-//   });
-// })();
-
-/*-------------------------5.1-------------------------------- */
-let movieData = [
-  {
-    name: "Raabta",
-    genre: "Romantic",
-    release_year: 2012,
-    artist: "Arijit Singh",
-    album: "Agent Vinod",
-    duration: 4,
-  },
-  {
-    name: "Naina Da kya Kasoor",
-    genre: "Pop",
-    release_year: 2018,
-    artist: "Amit Trivedi",
-    album: "Andhadhun",
-    duration: 3,
-  },
-  {
-    name: "Ghoomar",
-    genre: "Traditional",
-    release_year: 2018,
-    artist: "Shreya Ghoshal",
-    album: "Padmaavat",
-    duration: 3,
-  },
-];
-
+// Endpoint to seed database
 app.get("/seed_db", async (req, res) => {
-  try {
-    await sequelize.sync({ force: true });
+  await sequelize.sync({ force: true });
 
-    await track.bulkCreate(movieData);
+  const departments = await department.bulkCreate([
+    { name: "Engineering" },
+    { name: "Marketing" },
+  ]);
 
-    await user.create({
-      username: "testuser",
-      email: "testuser@gmail.com",
-      password: "testuser",
-    });
+  const roles = await role.bulkCreate([
+    { title: "Software Engineer" },
+    { title: "Marketing Specialist" },
+    { title: "Product Manager" },
+  ]);
 
-    res.status(200).json({ message: "Database seeding successful!" });
-  } catch (error) {
-    res
-      .status(500)
-      .json({ message: "Error seeding the data", error: error.message });
-  }
-});
+  const employees = await employee.bulkCreate([
+    { name: "Rahul Sharma", email: "rahul.sharma@example.com" },
+    { name: "Priya Singh", email: "priya.singh@example.com" },
+    { name: "Ankit Verma", email: "ankit.verma@example.com" },
+  ]);
 
-/*-------------------------5.2-------------------------------- */
-
-async function fetchAllTracks() {
-  let tracks = await track.findAll();
-  return { tracks };
-}
-
-app.get("/tracks", async (req, res) => {
-  try {
-    let response = await fetchAllTracks();
-    console.log(response);
-    if (response.tracks.length === 0) {
-      return res.status(404).json({ message: "No tracks found!" });
-    }
-    res.status(200).json(response);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-//findOne({where:{id}}),findAll(where:{artist}),findAll{order:[["release_year",order]]}#asc/desc
-
-/*-------------------------5.3-------------------------------- */
-
-async function addNewTrack(newTrack) {
-  let track1 = await track.create(newTrack);
-  return track1;
-}
-app.post("/tracks/new", async (req, res) => {
-  try {
-    let newTrack = req.body.newTrack;
-    let response = await addNewTrack(newTrack);
-    return res.status(200).json(response);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-async function updateTrack(id, updateTrackVal) {
-  let updateResponse = await track.findOne({ where: { id } });
-  if (!updateResponse) {
-    return {};
-  }
-  updateResponse.set(updateTrackVal);
-  let updatedTrack = await updateResponse.save();
-  return { message: "Track updated successfully", updatedTrack };
-}
-
-app.post("/tracks/update/:id", async (req, res) => {
-  try {
-    let id = parseInt(req.params.id);
-    let updateTrackVal = req.body;
-    let response = await updateTrack(id, updateTrackVal);
-    if (!response.message) {
-      return res
-        .status(404)
-        .json({ message: "Track for updation, Not Found!" });
-    }
-    return res.status(200).json(response);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-async function deleteTrackById(id) {
-  let trackDestroyed = await track.destroy({ where: { id } });
-  if (trackDestroyed === 0) {
-    return {};
-  }
-  return { message: "Track record deleted" };
-}
-
-app.post("/tracks/delete", async (req, res) => {
-  try {
-    let id = parseInt(req.body.id);
-    let response = await deleteTrackById(id);
-    if (!response.message) {
-      res.status(404).json({ message: "Track Not Found for Deletion!" });
-    }
-    return res.status(200).json(response);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-/*-------------------------5.4-------------------------------- */
-async function addNewUser(newUser) {
-  let newData = await user.create(newUser);
-  return newData;
-}
-
-app.post("/users/new", async (req, res) => {
-  try {
-    let newUser = req.body.newUser;
-    let response = await addNewUser(newUser);
-    return res.status(200).json(response);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-async function updateUserById(id, updateUser) {
-  let updatedResponse = await user.update(updateUser, { where: { id } });
-  return updatedResponse;
-}
-
-app.post("/users/update/:id", async (req, res) => {
-  try {
-    let id = parseInt(req.params.id);
-    let updateUser = req.body;
-    let response = await updateUserById(id, updateUser);
-    if (!response || response[0] === 0) {
-      return res.status(404).json({ message: "User Not Found" });
-    }
-    return res.status(200).json({ message: "User updated successfully" });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-async function fetchAllUsers() {
-  let users = await user.findAll();
-  return { users };
-}
-
-app.get("/users", async (req, res) => {
-  try {
-    let response = await fetchAllUsers();
-    console.log(response);
-    if (response.users.length === 0) {
-      return res.status(404).json({ message: "No tracks found!" });
-    }
-    res.status(200).json(response);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-async function likeTrack(data) {
-  let newLike = await like.create({
-    userId: data.userId,
-    trackId: data.trackId,
+  // Associate employees with departments and roles using create method on junction models
+  await employeeDepartment.create({
+    employeeId: employees[0].id,
+    departmentId: departments[0].id,
   });
-  return { message: "Track Liked!", newLike };
-}
-
-app.get("/users/:id/like", async (req, res) => {
-  try {
-    let userId = req.params.id;
-    let trackId = req.query.trackId;
-    let response = await likeTrack({ userId, trackId });
-    res.status(200).json(response);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-async function disLikeTrack(data) {
-  let count = await like.destroy({
-    where: { userId: data.userId, trackId: data.trackId },
+  await employeeRole.create({
+    employeeId: employees[0].id,
+    roleId: roles[0].id,
   });
-  if (count === 0) {
-    return {};
-  }
-  return { message: "Track DisLiked!" };
-}
 
-app.get("/users/:id/dislike", async (req, res) => {
-  try {
-    let userId = req.params.id;
-    let trackId = req.query.trackId;
-    let response = await disLikeTrack({ userId, trackId });
-    if (!response.message) {
-      res.status(404).json({ message: "No Like Found!" });
-    }
-    res.status(200).json(response);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-async function truncateDBs() {
-  track.truncate();
-  user.truncate();
-  like.truncate();
-  return { message: "Truncated All DBs" };
-}
-
-app.get("/truncate", async (req, res) => {
-  try {
-    let response = await truncateDBs();
-    res.status(200).json(response);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-async function getTracksLikedByUser(userId) {
-  let userLikedTracks = await like.findAll({
-    where: { userId },
-    attributes: ["trackId"],
+  await employeeDepartment.create({
+    employeeId: employees[1].id,
+    departmentId: departments[1].id,
   });
-  let trackIds = userLikedTracks.map((track) => track.trackId);
-  let likedTracks = await track.findAll({
-    where: { id: { [Op.in]: trackIds } },
+  await employeeRole.create({
+    employeeId: employees[1].id,
+    roleId: roles[1].id,
   });
-  return { likedTracks };
-}
 
-app.get("/users/:id/liked", async (req, res) => {
-  try {
-    let userId = req.params.id;
-    let response = await getTracksLikedByUser(userId);
-    if (response.likedTracks === 0) {
-      return res.status(404).json({ message: "No liked tracks found." });
-    }
-    res.status(200).json(response);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-async function getAllLikedTracksByArtist(userId, artist) {
-  let trackIds = await like.findAll({
-    where: { userId },
-    attributes: ["trackId"],
+  await employeeDepartment.create({
+    employeeId: employees[2].id,
+    departmentId: departments[0].id,
   });
-  trackIds = trackIds.map((like) => like.trackId);
-  let likedTracks = await track.findAll({
-    where: { id: { [Op.in]: trackIds }, artist },
+  await employeeRole.create({
+    employeeId: employees[2].id,
+    roleId: roles[2].id,
   });
-  return { likedTracks };
-}
 
-app.get("/users/:id/liked-artists", async (req, res) => {
-  try {
-    let userId = req.params.id;
-    let artist = req.query.artist;
-    let response = await getAllLikedTracksByArtist(userId, artist);
-    res.status(200).json(response);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
+  return res.json({ message: "Database seeded!" });
 });
 
 app.listen(port, () => {
