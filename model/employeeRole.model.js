@@ -1,5 +1,5 @@
 const { arch } = require("os");
-let { DataTypes, sequelize } = require("../lib/");
+let { DataTypes, sequelize } = require("../lib");
 const { role } = require("./role.model");
 const { employee } = require("./employee.model");
 
@@ -21,6 +21,6 @@ let employeeRole = sequelize.define("employeeRole", {
 });
 
 employee.belongsToMany(role, { through: employeeRole });
-role.belongsToMany(employee, { through: employeeDepartment });
+role.belongsToMany(employee, { through: employeeRole });
 
 module.exports = { employeeRole };

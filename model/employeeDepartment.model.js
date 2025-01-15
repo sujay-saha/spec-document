@@ -1,5 +1,5 @@
 const { arch } = require("os");
-let { DataTypes, sequelize } = require("../lib/");
+let { DataTypes, sequelize } = require("../lib");
 const e = require("cors");
 const { department } = require("./department.model");
 const { employee } = require("./employee.model");
