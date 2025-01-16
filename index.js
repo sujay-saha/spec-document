@@ -15,6 +15,9 @@ const req = require("express/lib/request");
 const res = require("express/lib/response");
 const { userInfo } = require("os");
 const { threadId } = require("worker_threads");
+const { where } = require("sequelize");
+const { types } = require("util");
+const { attribute } = require("@sequelize/core/_non-semver-use-at-your-own-risk_/expression-builders/attribute.js");
 // let sqlite3 = require('sqlite3').verbose();
 // let { open } = require('sqlite');
 
@@ -74,6 +77,151 @@ app.get("/seed_db", async (req, res) => {
   });
 
   return res.json({ message: "Database seeded!" });
+});
+
+async function getEmployeeDepartments(employeeId){
+  let employeeDepartments = await employeeDepartment.findAll({where:{employeeId}});
+  let departmentNames = [];
+  for(const ed of employeeDepartments){
+    let id = ed.departmentId;
+    departmentNames.push(await department.findOne({where:{id}}));
+  };
+  return departmentNames;
+}
+
+app.get("/employee/:id/departments",async (req,res)=>{
+  let id = req.params.id;
+  let response = await getEmployeeDepartments(id);
+  res.status(200).json(response);
+})
+
+async function getEmployeeRoles(employeeId){
+  let employeeRoleIds = await employeeRole.findAll(
+    {
+      where:{employeeId}
+    }
+  );
+  let employeeRoles = [];
+  for(const roles of employeeRoleIds){
+    employeeRoles.push(await role.findOne({where:{id:roles.roleId}}));
+  }
+  return employeeRoles;
+}
+
+app.get("/employee/:id/roles",async (req,res)=>{
+  let id = req.params.id;
+  let response = await getEmployeeDetails({id});
+  res.status(200).json(response);
+})
+
+async function getEmployeeDetails(employeeData){
+  const department = await getEmployeeDepartments(employeeData.id);
+  const role = await getEmployeeRoles(employeeData.id);
+  
+  return {
+    ...employeeData.dataValues,
+    department,
+    role,
+  };
+}
+
+async function getEmployees(){
+  let employeeDetails = await employee.findAll();
+  let employees = [];
+  for(const employeeDetail of employeeDetails){
+    employees.push(await getEmployeeDetails(employeeDetail));
+  }
+  return {employees};
+}
+
+app.get("/employees",async (req,res)=>{
+  let response = await getEmployees();
+  res.status(200).json(response);
+});
+
+async function getEmployeeDetailsById(id){
+  let employeeDetails = await employee.findOne({where:{id}});  
+  let response = await getEmployeeDetails(employeeDetails);
+  return {employee:response};
+}
+
+app.get("/employees/details/:id",async (req,res)=>{
+  let id = req.params.id;
+  let response = await getEmployeeDetailsById(id);
+  res.status(200).json(response);
+});
+
+async function getEmployeeDetailsByDepartmentId(departmentId){
+  let employeeIdsByDepartment = await employeeDepartment.findAll({where:{departmentId}});
+  let employeesByDepartment =[];
+  for(const emp of employeeIdsByDepartment){
+    let basicEmployeeDetails =await employee.findOne({where:{id:emp.employeeId}});
+    employeesByDepartment.push(await getEmployeeDetails(basicEmployeeDetails));
+  }
+  return {employees:employeesByDepartment};
+}
+
+app.get("/employees/department/:departmentId",async (req,res)=>{
+  let departmentId = req.params.departmentId;
+  let response = await getEmployeeDetailsByDepartmentId(departmentId);
+  res.status(200).json(response);
+});
+
+async function getEmployeeByRoleId(roleId){
+  let employeeRoleIds = await employeeRole.findAll({where:{roleId}});
+  let employeesDataByRole = [];
+  for(const employeeRoleId of employeeRoleIds){
+    let basicEmployeeDetails = await employee.findOne({where:{id:employeeRoleId.employeeId}});
+    console.log(basicEmployeeDetails);
+    employeesDataByRole.push(await getEmployeeDetails(basicEmployeeDetails));
+  }
+  return {employees:employeesDataByRole};
+}
+
+app.get("/employees/role/:roleId",async (req,res)=>{
+  let roleId = req.params.roleId;
+  let response = await getEmployeeByRoleId(roleId);
+  res.status(200).json(response);
+});
+
+async function sortEmployeesByName(order){
+  let employeeBasicDetailsSortedList = await employee.findAll({order:[["name",order.toUpperCase()]]});
+  let employeeDetailsSortedList = [];
+  for(const emp of employeeBasicDetailsSortedList){
+    employeeDetailsSortedList.push(await getEmployeeDetails(emp));
+  }
+  return {employees:employeeDetailsSortedList};
+}
+
+app.get("/employees/sort-by-name",async (req,res)=>{
+  let order = req.query.order;
+  let response = await sortEmployeesByName(order);
+  res.status(200).json(response);
+});
+
+async function addEmployee(employeeObject){
+  let employeeData = await employee.create(
+    {name:employeeObject.name,
+      email:employeeObject.email});
+  let department=await employeeDepartment.create(
+    {employeeId: employeeData.id,
+    departmentId: employeeObject.departmentId});
+  let role=await employeeRole.create(
+    {employeeId:employeeData.id,
+    roleId:employeeObject.roleId});
+
+   return {
+    ...employeeData.dataValues,
+    department,
+    role,
+  };;
+}
+
+app.post("/employees/new",async (req,res)=>{
+  let employeeObject = JSON.parse(JSON.stringify(req.body));
+  console.log(employeeObject)
+  let response = await addEmployee(employeeObject);
+  res.status(200).json(response);
 });
 
 app.listen(port, () => {
