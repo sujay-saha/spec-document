@@ -214,7 +214,7 @@ async function addEmployee(employeeObject){
     ...employeeData.dataValues,
     department,
     role,
-  };;
+  };
 }
 
 app.post("/employees/new",async (req,res)=>{
@@ -223,6 +223,65 @@ app.post("/employees/new",async (req,res)=>{
   let response = await addEmployee(employeeObject);
   res.status(200).json(response);
 });
+
+async function updateEmployeeById(id,updatedEmployee){
+  let employeeObj = await employee.findOne({where:{id}});
+  if(updatedEmployee.name){
+    employeeObj.name = updatedEmployee.name;
+  }
+  if(updatedEmployee.email){
+    employeeObj.email = updatedEmployee.email;
+  }
+  if(updatedEmployee.departmentId){
+    await employeeDepartment.destroy({
+      where: {
+        employeeId: parseInt(employeeObj.id),
+      }
+    });
+    await employeeDepartment.create({
+      departmentId: updatedEmployee.departmentId,
+      employeeId: employeeObj.id
+    });
+
+  }
+  if(updatedEmployee.roleId){
+    await employeeRole.destroy({
+      where: {
+        employeeId: parseInt(employeeObj.id),
+      }
+    });
+
+    await employeeRole.create({
+      roleId: updatedEmployee.roleId,
+      employeeId: employeeObj.id
+    });
+  }
+
+  return getEmployeeDetails(employeeObj);
+}
+
+app.post("/employees/update/:id", async (req,res)=>{
+  let id = req.params.id;
+  let updatedEmployee = req.body;
+  let response = await updateEmployeeById(id,updatedEmployee);
+  res.status(200).json(response);
+});
+
+async function deleteEmployeeById(id){
+  let employeeDData = await employee.destroy({where:{id}});
+  if(!employeeDData){
+    return {message:"Employee not found."};
+  }
+  await employeeDepartment.destroy({where:{employeeId:id}});
+  await employeeRole.destroy({where:{employeeId:id}});
+  return {message : "Employee with ID "+ id +" has been deleted."};
+}
+
+app.post("/employees/delete", async (req,res)=>{
+  let id = req.body.id;
+  let response = await deleteEmployeeById(id);
+  res.status(200).json(response);
+})
 
 app.listen(port, () => {
   console.log(`Example app listening at http://localhost:${port}`);
