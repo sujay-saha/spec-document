@@ -227,7 +227,7 @@ async function sortEmployeesByName(order) {
     order: [["name", order.toUpperCase()]],
   });
   let employeeDetailsSortedList = [];
-  if (employeeBasicDetailsSortedList === []) {
+  if (employeeBasicDetailsSortedList.length === 0 ) {
     return [];
   }
   for (const emp of employeeBasicDetailsSortedList) {
